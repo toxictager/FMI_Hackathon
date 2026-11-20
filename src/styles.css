@@ -99,9 +99,13 @@
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
+  /* Route cards that win more than one category: calm forest green on the cream background. */
+  --win: oklch(0.52 0.1 155);
 }
 
 .dark {
+  /* Brighter emerald reads well on the dark background. */
+  --win: oklch(0.765 0.177 163.223);
   --background: oklch(0.129 0.042 264.695);
   --foreground: oklch(0.984 0.003 247.858);
   --card: oklch(0.208 0.042 265.755);
@@ -172,6 +176,11 @@
 }
 .route-card-shared:hover {
   box-shadow:
-    0 0 0 1px rgba(34, 197, 94, 0.7),
-    0 0 28px rgba(34, 197, 94, 0.5);
+    0 0 0 1px color-mix(in oklch, var(--win) 55%, transparent),
+    0 0 22px color-mix(in oklch, var(--win) 22%, transparent);
+}
+.dark .route-card-shared:hover {
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--win) 70%, transparent),
+    0 0 28px color-mix(in oklch, var(--win) 45%, transparent);
 }
