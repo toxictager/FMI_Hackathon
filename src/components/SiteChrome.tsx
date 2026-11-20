@@ -27,7 +27,7 @@ export function Header() {
       <div className="flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <LogoMark className="h-9 w-9" />
-          <span className="font-display text-2xl font-extrabold tracking-tight text-foreground">Routique</span>
+          <span className="brand-wordmark text-2xl font-extrabold tracking-tight text-foreground">Routique</span>
         </Link>
         <div className="flex items-center gap-4">
           <span className="hidden text-sm text-muted-foreground sm:block">Bulgaria, end to end</span>

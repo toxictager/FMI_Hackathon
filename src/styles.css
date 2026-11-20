@@ -175,6 +175,15 @@
   letter-spacing: -0.01em;
 }
 
+/* The "Routique" name in the header is part of the logo: same serif on every page,
+   including pages that switch their text to Inter with .font-unified. */
+.brand-wordmark,
+.font-unified .brand-wordmark {
+  font-family: "Fraunces", "Times New Roman", serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.02em;
+}
+
 /* Route cards whose winning mode also wins another card: glow green on hover. */
 .route-card-shared {
   box-shadow: var(--shadow-card);
