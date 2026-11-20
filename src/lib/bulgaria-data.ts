@@ -111,3 +111,53 @@ export const LANDMARKS: Landmark[] = [
     hours: "Daily, daylight hours", ticketPrice: "Park entry 3 BGN", bestTime: "Spring after snowmelt for maximum flow",
     tips: ["Swimming is forbidden to protect the travertine", "Combine with Devetashka Cave 25 km away", "Avoid weekends in July & August — it gets very crowded"] },
 ];
+
+
+interface WikiThumbnail {
+  source: string;
+  width: number;
+  height: number;
+}
+
+interface WikiPage {
+  pageid: number;
+  ns: number;
+  title: string;
+  index: number;
+  thumbnail?: WikiThumbnail;
+}
+
+interface WikiQueryResponse {
+  query?: {
+    pages?: Record<string, WikiPage>;
+  };
+}
+
+export async function getWikiLandmarkImage(
+  landmarkName: string,
+  thumbSize = 1200
+): Promise<string | null> {
+  const params = new URLSearchParams({
+    action: "query",
+    generator: "search",
+    gsrsearch: landmarkName,
+    gsrlimit: "1",
+    prop: "pageimages",
+    piprop: "thumbnail",
+    pithumbsize: thumbSize.toString(),
+    format: "json",
+    origin: "*", // Required for browser CORS requests
+  });
+
+  const res = await fetch(`https://en.wikipedia.org/w/api.php?${params.toString()}`);
+  if (!res.ok) {
+    throw new Error(`Wikipedia API request failed: ${res.status}`);
+  }
+
+  const data = (await res.json()) as WikiQueryResponse;
+  const pages = data.query?.pages;
+  if (!pages) return null;
+
+  const firstPage = Object.values(pages)[0];
+  return firstPage?.thumbnail?.source ?? null;
+}

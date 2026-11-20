@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import {
   Bus, Train, Car, Clock, Euro, Zap, PiggyBank, Sparkles, ArrowLeft,
   Fuel, Ticket, CarTaxiFront, AlertTriangle, Info, CloudRain, Map as MapIcon,
 } from "lucide-react";
-import { LANDMARKS, CITY_COORDS, type Coords, type Landmark } from "@/lib/bulgaria-data";
+import { LANDMARKS, CITY_COORDS, getWikiLandmarkImage, type Coords, type Landmark } from "@/lib/bulgaria-data";
 import { decodePolyline, distanceToPathKm, distanceToSegmentKm, roadKm } from "@/lib/geo";
 import { postJson } from "@/lib/api";
 import type { BdzDeparture, BdzScheduleResult, DirectionsResult } from "@/lib/types";
@@ -385,6 +386,24 @@ function AlertCard({ alert }: { alert: Alert }) {
 }
 
 function LandmarkCard({ landmark }: { landmark: Landmark & { detourKm: number } }) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getWikiLandmarkImage(landmark.name)
+      .then((url) => {
+        if (isMounted) setImageUrl(url);
+      })
+      .catch(() => {
+        if (isMounted) setImageUrl(null);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [landmark.name]);
+
   return (
     <Link
       to={`/landmark/${landmark.slug}`}
@@ -392,10 +411,13 @@ function LandmarkCard({ landmark }: { landmark: Landmark & { detourKm: number } 
       style={{ boxShadow: "var(--shadow-card)" }}
     >
       <div
-        className="mb-4 flex h-24 w-full items-center justify-center rounded-xl text-5xl"
-        style={{ background: "var(--gradient-warm)", opacity: 0.95 }}
+        className="mb-4 flex h-24 w-full items-center justify-center rounded-xl bg-slate-200 bg-cover bg-center text-5xl"
+        style={{
+          backgroundImage: imageUrl ? `url("${imageUrl}")` : "var(--gradient-warm)",
+          opacity: 0.95,
+        }}
       >
-        <span aria-hidden>{landmark.emoji}</span>
+        {!imageUrl && <span aria-hidden>{landmark.emoji}</span>}
       </div>
       <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         <span><CloudRain className="mr-1 inline h-3 w-3" />{landmark.city}</span>
@@ -403,7 +425,7 @@ function LandmarkCard({ landmark }: { landmark: Landmark & { detourKm: number } 
           {landmark.detourKm < 1 ? "on route" : `${landmark.detourKm.toFixed(0)} km off`}
         </span>
       </div>
-      <h4 className="mt-1 font-display text-lg font-bold text-foreground transition-colors group-hover:text-primary">{landmark.name}</h4>
+      <h4 className="mt-1 font-display text-lg font-bold text-foreground transition-colors group-hover:text-primary"><span aria-hidden>{imageUrl ? landmark.emoji + " " : ""}</span>{landmark.name}</h4>
       <p className="mt-1 text-sm text-muted-foreground">{landmark.description}</p>
       <span className="mt-3 text-xs font-semibold uppercase tracking-wider text-primary opacity-0 transition-opacity group-hover:opacity-100">
         View details →
