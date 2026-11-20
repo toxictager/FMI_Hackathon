@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Clock, Ticket, CalendarHeart, ExternalLink, MapPin, Lightbulb, Info, BookOpen } from "lucide-react";
 import { LANDMARKS, WikiLandmarkSummary, getWikiLandmarkSummary, getWikiLandmarkImage } from "@/lib/bulgaria-data";
@@ -156,6 +157,21 @@ export default function LandmarkPage() {
             <InfoCard icon={Clock} label="Opening hours" value={l.hours} />
             <InfoCard icon={Ticket} label="Tickets & fees" value={l.ticketPrice} />
             <InfoCard icon={CalendarHeart} label="Best time to visit" value={l.bestTime} />
+
+            <MapContainer
+              center={[lat, lng]}
+              zoom={13}
+              scrollWheelZoom={false}
+              className="h-80 w-full rounded-2xl"
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <Marker position={[lat, lng]}>
+                <Popup>{l.name}</Popup>
+              </Marker>
+            </MapContainer>
 
             <a
               href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
