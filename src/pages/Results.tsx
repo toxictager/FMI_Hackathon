@@ -167,10 +167,21 @@ const CAT_META: Record<Category, { label: string; tagline: string; icon: typeof 
   convenient: { label: "Most Convenient", tagline: "Smoothest ride",      icon: Sparkles,   accent: "from-accent to-secondary" },
 };
 
+function toTitleCase(str: String) {
+  return str
+    .toLowerCase()
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export default function ResultsPage() {
   const [params] = useSearchParams();
-  const from = params.get("from") ?? "";
-  const to = params.get("to") ?? "";
+  const fromRaw = params.get("from") ?? "";
+  const toRaw = params.get("to") ?? "";
+
+  const from = fromRaw ? toTitleCase(fromRaw) : "";
+  const to = toRaw ? toTitleCase(toRaw) : "";
 
   useDocumentMeta(
     from && to ? `${from} → ${to} — Routique` : "Routes — Routique",
