@@ -15,37 +15,65 @@ export async function getDirections(input: {
   if (!key) {
     throw new Error("GOOGLE_MAPS_API_KEY is not configured on the server");
   }
-  const url = new URL("https://maps.googleapis.com/maps/api/directions/json");
-  url.searchParams.set("origin", `${input.from.lat},${input.from.lng}`);
-  url.searchParams.set("destination", `${input.to.lat},${input.to.lng}`);
-  url.searchParams.set("mode", "driving");
-  url.searchParams.set("region", "bg");
-  url.searchParams.set("key", key);
 
-  const res = await fetch(url.toString());
+  const res = await fetch(
+    "https://routes.googleapis.com/directions/v2:computeRoutes",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": key,
+        "X-Goog-FieldMask":
+          "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline",
+      },
+      body: JSON.stringify({
+        origin: {
+          location: {
+            latLng: { latitude: input.from.lat, longitude: input.from.lng },
+          },
+        },
+        destination: {
+          location: {
+            latLng: { latitude: input.to.lat, longitude: input.to.lng },
+          },
+        },
+        travelMode: "DRIVE",
+        regionCode: "BG",
+      }),
+    },
+  );
+
   if (!res.ok) {
-    throw new Error(`Google Directions error ${res.status}`);
-  }
-  const json = (await res.json()) as {
-    status: string;
-    error_message?: string;
-    routes: Array<{
-      overview_polyline: { points: string };
-      legs: Array<{ distance: { value: number }; duration: { value: number } }>;
-    }>;
-  };
-  if (json.status !== "OK" || !json.routes[0]) {
+    const err = (await res.json().catch(() => null)) as {
+      error?: { status?: string; message?: string };
+    } | null;
     throw new Error(
-      `Directions failed: ${json.status}${json.error_message ? ` — ${json.error_message}` : ""}`,
+      `Routes API error ${res.status}${
+        err?.error ? `: ${err.error.status} — ${err.error.message}` : ""
+      }`,
     );
   }
-  const route = json.routes[0];
-  const meters = route.legs.reduce((s, l) => s + l.distance.value, 0);
-  const seconds = route.legs.reduce((s, l) => s + l.duration.value, 0);
+
+  const json = (await res.json()) as {
+    routes?: Array<{
+      distanceMeters?: number;
+      duration?: string; // e.g. "1234s"
+      polyline?: { encodedPolyline: string };
+    }>;
+  };
+
+  const route = json.routes?.[0];
+  if (!route || !route.polyline) {
+    throw new Error("Routes API returned no route for these coordinates");
+  }
+
+  const meters = route.distanceMeters ?? 0;
+  const seconds = parseInt(route.duration ?? "0", 10); // "1234s" -> 1234
+
   return {
     distanceKm: Math.round(meters / 100) / 10,
     durationMin: Math.round(seconds / 60),
-    polyline: route.overview_polyline.points,
-    status: json.status,
+    polyline: route.polyline.encodedPolyline,
+    status: "OK",
   };
 }
