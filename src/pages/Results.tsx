@@ -463,9 +463,11 @@ function LandmarkCard({ landmark }: { landmark: Landmark & { detourKm: number } 
     };
   }, [landmark.name]);
 
+  const [searchParams] = useSearchParams();
+
   return (
     <Link
-      to={`/landmark/${landmark.slug}`}
+      to={`/landmark/${landmark.slug}?${searchParams.toString()}`}
       className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all hover:-translate-y-1 hover:border-primary/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       style={{ boxShadow: "var(--shadow-card)" }}
     >

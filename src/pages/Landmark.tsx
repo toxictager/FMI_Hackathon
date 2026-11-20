@@ -1,12 +1,15 @@
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Clock, Ticket, CalendarHeart, ExternalLink, MapPin, Lightbulb } from "lucide-react";
-import { LANDMARKS } from "@/lib/bulgaria-data";
+import { LANDMARKS, getWikiLandmarkImage } from "@/lib/bulgaria-data";
 import { Header, Footer } from "@/components/SiteChrome";
 import { useDocumentMeta } from "@/lib/useDocumentMeta";
 import NotFound from "./NotFound";
 
 export default function LandmarkPage() {
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
+  const queryString = searchParams.toString();
   const l = LANDMARKS.find((x) => x.slug === slug);
 
   useDocumentMeta(
@@ -17,28 +20,62 @@ export default function LandmarkPage() {
   if (!l) return <NotFound />;
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${l.lat},${l.lng}`;
 
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getWikiLandmarkImage(l.name)
+      .then((url) => {
+        if (isMounted) setImageUrl(url);
+      })
+      .catch(() => {
+        if (isMounted) setImageUrl(null);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [l.name]);
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
+      <br />
 
-      <section
-        className="relative overflow-hidden border-b border-border"
-        style={{ background: "var(--gradient-warm)" }}
-      >
-        <div className="container mx-auto px-6 py-12 md:py-16">
-          <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-foreground/80 hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Back to search
-          </Link>
-          <div className="mt-6 flex items-start gap-5">
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl bg-background/70 text-6xl shadow-lg">
-              <span aria-hidden>{l.emoji}</span>
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-foreground/70">
-                <MapPin className="mr-1 inline h-3 w-3" />{l.city}
-              </p>
-              <h1 className="mt-1 font-display text-4xl font-bold text-foreground md:text-5xl">{l.name}</h1>
-              <p className="mt-3 max-w-2xl text-base text-foreground/80">{l.description}</p>
+      <section className="relative overflow-hidden border-b border-border">
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 scale-110 bg-cover bg-center"
+          style={{
+            backgroundImage: imageUrl ? `url("${imageUrl}")` : "var(--gradient-warm)",
+            filter: "blur(0px)",
+          }}
+        />
+        <div className="relative z-10">
+          <div className="container mx-auto px-10 pt-8 pb-26">
+            <Link to={queryString ? `/results?${queryString}` : "/"} className={`inline-flex items-center gap-2 text-sm font-semibold underline-offset-4 hover:underline ${imageUrl ? "text-white/80" : "text-foreground/80"} hover:text-underline`}>
+              <ArrowLeft className="h-4 w-4" /> Back to search
+            </Link>
+          </div>
+          <div className={`container mx-auto px-10 pb-40 ${imageUrl ? "text-white" : ""}`}>
+            <div className="mt-6 flex items-start gap-5">
+              {!imageUrl && <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl bg-background/70 text-6xl shadow-lg">
+                <span aria-hidden>{l.emoji}</span>
+              </div>}
+              <div
+                className={
+                  imageUrl
+                    ? "px-8 py-6 rounded-3xl bg-background/70 shadow-lg"
+                    : undefined
+                }
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-foreground">
+                  <MapPin className="mr-1 inline h-3 w-3" />{l.city}
+                </p>
+                <h1 className="mt-1 font-display text-4xl font-bold text-foreground md:text-5xl">{l.name}</h1>
+                <p className="text-[25px] mt-3 max-w-2xl text-base text-foreground/80">{l.description}</p>
+              </div>
             </div>
           </div>
         </div>
