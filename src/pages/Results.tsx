@@ -18,6 +18,7 @@ type Mode = "bus" | "train" | "car";
 type Category = "fastest" | "cheapest" | "convenient";
 
 interface RouteOption {
+  sharedWith: Category[];
   category: Category;
   mode: Mode;
   hours: number;
@@ -39,47 +40,94 @@ function lookupCoords(name: string): Coords | null {
   return CITY_COORDS[name.trim().toLowerCase()] ?? null;
 }
 
-function generateRoutes(seed: number, km: number, realDriveMin?: number, trainMin?: number): RouteOption[] {
-  const fastestTotalMin = realDriveMin ?? Math.max(45, Math.round((km / 95) * 60));
-  const cheapestTotalMin = Math.round((km / 70) * 60) + 60;
-  const convTotalMin = trainMin ?? Math.round((km / 80) * 60) + 20;
+  interface ModeOption {
+  mode: Mode;
+  totalMinutes: number;
+  cost: number;
+  transfers: number;
+  note: string;
+  breakdown: { label: string; amount: number; icon: typeof Fuel }[];
+}
+
+// Every mode is calculated for every trip. Each card then picks its winner by
+// comparing these numbers, so one mode can win more than one card.
+function buildModeOptions(seed: number, km: number, realDriveMin?: number, trainMin?: number): ModeOption[] {
+  const carMinutes = realDriveMin ?? Math.max(45, Math.round((km / 95) * 60));
+  const busMinutes = Math.round((km / 70) * 60) + 60;
+  const trainMinutes = trainMin ?? Math.round((km / 80) * 60) + 20;
 
   const fuel = Math.round(km * 0.085 * 10) / 10;
   const tolls = km > 200 ? Math.round((km * 0.012) * 10) / 10 : 0;
-  const fastestCost = Math.round((fuel + tolls) * 10) / 10;
+  const carCost = Math.round((fuel + tolls) * 10) / 10;
 
   const ticket = Math.round((km * 0.045 + 4) * 10) / 10;
   const transfer = Math.round((seed % 3) * 1.5 * 10) / 10;
   const taxiToTerminal = 4 + (seed % 4);
-  const cheapestCost = Math.round((ticket + transfer + taxiToTerminal) * 10) / 10;
+  const busCost = Math.round((ticket + transfer + taxiToTerminal) * 10) / 10;
 
   const trainTicket = Math.round((km * 0.06 + 5) * 10) / 10;
   const taxiToStation = 5 + (seed % 5);
-  const convCost = Math.round((trainTicket + taxiToStation) * 10) / 10;
+  const trainCost = Math.round((trainTicket + taxiToStation) * 10) / 10;
 
   return [
-    { category: "fastest",    mode: "car",   hours: Math.floor(fastestTotalMin/60), minutes: fastestTotalMin%60, cost: fastestCost,
+    {
+      mode: "car", totalMinutes: carMinutes, cost: carCost, transfers: 0,
       note: "Direct highway route via private car",
       breakdown: [
         { label: "Fuel (~7L/100km)", amount: fuel, icon: Fuel },
         { label: "Tolls & vignette", amount: tolls, icon: Ticket },
         { label: "Taxi", amount: 0, icon: CarTaxiFront },
-      ]},
-    { category: "cheapest",   mode: "bus",   hours: Math.floor(cheapestTotalMin/60), minutes: cheapestTotalMin%60, cost: cheapestCost,
+      ],
+    },
+    {
+      mode: "bus", totalMinutes: busMinutes, cost: busCost, transfers: transfer > 0 ? 1 : 0,
       note: "Intercity bus, may include a transfer",
       breakdown: [
         { label: "Bus ticket", amount: ticket, icon: Ticket },
         { label: "Transfer fee", amount: transfer, icon: Bus },
         { label: "Taxi to terminal", amount: taxiToTerminal, icon: CarTaxiFront },
-      ]},
-    { category: "convenient", mode: "train", hours: Math.floor(convTotalMin/60), minutes: convTotalMin%60, cost: convCost,
+      ],
+    },
+    {
+      mode: "train", totalMinutes: trainMinutes, cost: trainCost, transfers: 0,
       note: "Direct train, comfortable seating",
       breakdown: [
         { label: "Train ticket", amount: trainTicket, icon: Ticket },
         { label: "Fuel", amount: 0, icon: Fuel },
         { label: "Taxi to station", amount: taxiToStation, icon: CarTaxiFront },
-      ]},
+      ],
+    },
   ];
+}
+
+// Each transfer counts as this many extra minutes when judging convenience.
+const TRANSFER_PENALTY_MIN = 30;
+
+function minBy<T>(items: T[], score: (item: T) => number): T {
+  return items.reduce((best, item) => (score(item) < score(best) ? item : best));
+}
+
+function generateRoutes(seed: number, km: number, realDriveMin?: number, trainMin?: number): RouteOption[] {
+  const options = buildModeOptions(seed, km, realDriveMin, trainMin);
+
+  const picks: Array<[Category, ModeOption]> = [
+    ["fastest", minBy(options, (o) => o.totalMinutes)],
+    ["cheapest", minBy(options, (o) => o.cost)],
+    ["convenient", minBy(options, (o) => o.totalMinutes + o.transfers * TRANSFER_PENALTY_MIN)],
+  ];
+
+  return picks.map(([category, opt]) => ({
+    category,
+    mode: opt.mode,
+    hours: Math.floor(opt.totalMinutes / 60),
+    minutes: opt.totalMinutes % 60,
+    cost: opt.cost,
+    note: opt.note,
+    breakdown: opt.breakdown,
+    sharedWith: picks
+      .filter(([other, o]) => other !== category && o.mode === opt.mode)
+      .map(([other]) => other),
+  }));
 }
 
 function generateAlerts(seed: number): Alert[] {
@@ -287,12 +335,15 @@ function EmptyState() {
 
 function RouteCard({ route }: { route: RouteOption }) {
   const meta = CAT_META[route.category];
+  const isShared = route.sharedWith.length >0;
   const ModeIcon = MODE_ICON[route.mode];
   const CatIcon = meta.icon;
   return (
     <article
-      className="group relative flex flex-col overflow-hidden rounded-3xl border border-border bg-card p-6 transition-all hover:-translate-y-1"
-      style={{ boxShadow: "var(--shadow-card)" }}
+      className={`group relative flex flex-col overflow-hidden rounded-3xl border border-border bg-card p-6 transition-all hover:-translate-y-1 ${
+        isShared ? "route-card-shared" : ""
+      }`}
+      style={isShared ? undefined : { boxShadow: "var(--shadow-card)" }}  
     >
       <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${meta.accent}`} />
       <div className="flex items-start justify-between">
@@ -300,7 +351,9 @@ function RouteCard({ route }: { route: RouteOption }) {
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <CatIcon className="h-3.5 w-3.5" />{meta.tagline}
           </div>
-          <h3 className="mt-1 text-2xl font-bold text-foreground">{meta.label}</h3>
+          <h3 className={`mt-1 text-2xl font-bold ${isShared ? "text-emerald-500 dark:text-emerald-400" : "text-foreground"}`}>
+            {meta.label}
+          </h3>
         </div>
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-muted text-foreground">
           <ModeIcon className="h-5 w-5" />
@@ -312,7 +365,13 @@ function RouteCard({ route }: { route: RouteOption }) {
       </div>
       <p className="mt-5 text-sm text-muted-foreground">
         <span className="font-medium text-foreground">{MODE_LABEL[route.mode]}</span> · {route.note}
+        {route.sharedWith.length > 0 && (
+          <span className="mt-2 block text-xs font-semibold text-primary">
+            Also the {route.sharedWith.map((c) => CAT_META[c].label.toLowerCase()).join(" and ")}
+          </span>
+        )}
       </p>
+      
       <div className="mt-5 rounded-2xl bg-muted/60 p-4">
         <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Cost breakdown</div>
         <ul className="mt-3 space-y-2">
