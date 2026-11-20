@@ -10,7 +10,11 @@ export interface Coords {
   lng: number;
 }
 
-export async function geocode(name: string): Promise<Coords> {
+export interface GeocodeResult extends Coords {
+  name: string;
+}
+
+export async function geocode(name: string): Promise<GeocodeResult> {
   const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
   url.searchParams.set("name", name);
   url.searchParams.set("count", "1");
@@ -21,12 +25,12 @@ export async function geocode(name: string): Promise<Coords> {
   if (!res.ok) throw new Error(`Geocoding error ${res.status}`);
 
   const json = (await res.json()) as {
-    results?: Array<{ latitude: number; longitude: number }>;
+    results?: Array<{ name: string; latitude: number; longitude: number }>;
   };
   const hit = json.results?.[0];
   if (!hit) throw new Error(`Could not find "${name}"`);
 
-  return { lat: hit.latitude, lng: hit.longitude };
+  return { name: hit.name, lat: hit.latitude, lng: hit.longitude };
 }
 
 export interface Landmark {

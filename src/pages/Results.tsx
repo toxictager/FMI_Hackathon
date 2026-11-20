@@ -6,7 +6,7 @@ import {
   Bus, Train, Car, Clock, Euro, Zap, PiggyBank, Sparkles, ArrowLeft,
   Fuel, Ticket, CarTaxiFront, AlertTriangle, Info, CloudRain, Map as MapIcon,
 } from "lucide-react";
-import { LANDMARKS, geocode, getWikiLandmarkImage, type Coords, type Landmark } from "@/lib/bulgaria-data";
+import { LANDMARKS, geocode, getWikiLandmarkImage, type GeocodeResult, type Coords, type Landmark } from "@/lib/bulgaria-data";
 import { decodePolyline, distanceToPathKm, distanceToSegmentKm, roadKm } from "@/lib/geo";
 import { postJson } from "@/lib/api";
 import type { AlertsResult, BdzDeparture, BdzScheduleResult, DirectionsResult, TripAlert } from "@/lib/types";
@@ -34,7 +34,7 @@ function hashStr(s: string) {
   let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return Math.abs(h);
 }
-async function lookupCoords(name: string): Promise<Coords | null> {
+async function lookupTownCoords(name: string): Promise<GeocodeResult | null> {
   try {
     return await geocode(name);
   } catch {
@@ -167,27 +167,24 @@ function toTitleCase(str: String) {
 
 export default function ResultsPage() {
   const [params] = useSearchParams();
-  const fromRaw = params.get("from") ?? "";
-  const toRaw = params.get("to") ?? "";
-
-  const from = fromRaw ? toTitleCase(fromRaw) : "";
-  const to = toRaw ? toTitleCase(toRaw) : "";
-
-  useDocumentMeta(
-    from && to ? `${from} → ${to} — Routique` : "Routes — Routique",
-    `Compare bus, train and car routes from ${from || "your start"} to ${to || "your destination"} in Bulgaria.`,
-  );
+  const from = params.get("from") ?? "";
+  const to = params.get("to") ?? "";
 
   const coordsQuery = useQuery({
     queryKey: ["coords", from, to],
     enabled: !!from && !!to,
     queryFn: async () => {
-      const [fromCoords, toCoords] = await Promise.all([
-        lookupCoords(from),
-        lookupCoords(to),
+      const [fromGeo, toGeo] = await Promise.all([
+        lookupTownCoords(from),
+        lookupTownCoords(to),
       ]);
-      if (!fromCoords || !toCoords) return null; // town not found
-      return { fromCoords, toCoords };
+      if (!fromGeo || !toGeo) return null; // town not found
+      return {
+        fromCoords: fromGeo,
+        toCoords: toGeo,
+        fromName: fromGeo.name,
+        toName: toGeo.name,
+      };
     },
     staleTime: Infinity, // town coordinates never change
   });
@@ -198,6 +195,14 @@ export default function ResultsPage() {
     const seed = hashStr(from.toLowerCase() + "→" + to.toLowerCase());
     return { ...coords, seed };
   }, [coordsQuery.data, from, to]);
+
+  const fromLabel = base?.fromName ?? from;
+  const toLabel = base?.toName ?? to;
+
+  useDocumentMeta(
+    fromLabel && toLabel ? `${fromLabel} → ${toLabel} — Routique` : "Routes — Routique",
+    `Compare bus, train and car routes from ${fromLabel || "your start"} to ${toLabel || "your destination"} in Bulgaria.`,
+  );
 
   const directionsQuery = useQuery<DirectionsResult>({
     queryKey: ["directions", from, to],
@@ -331,7 +336,7 @@ export default function ResultsPage() {
           <div className="space-y-14">
             <div className="flex items-baseline justify-between gap-4 flex-wrap">
               <h1 className="font-display text-3xl font-bold text-foreground sm:text-5xl">
-                {from} <span className="text-muted-foreground">→</span> {to}
+                {fromLabel} <span className="text-muted-foreground">→</span> {toLabel}
               </h1>
               <span className="text-sm text-muted-foreground">
                 {directionsQuery.isLoading
@@ -352,8 +357,8 @@ export default function ResultsPage() {
                 <RouteMap
                   from={trip.fromCoords}
                   to={trip.toCoords}
-                  fromName={from}
-                  toName={to}
+                  fromName={fromLabel}
+                  toName={toLabel}
                   path={trip.pathLatLng}
                 />
               </section>

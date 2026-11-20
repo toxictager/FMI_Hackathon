@@ -54,9 +54,17 @@ export default function LandmarkPage() {
         />
         <div className="relative z-10">
           <div className="container mx-auto px-10 pt-8 pb-26">
-            <Link to={queryString ? `/results?${queryString}` : "/"} className={`inline-flex items-center gap-2 text-sm font-semibold underline-offset-4 hover:underline ${imageUrl ? "text-white/80" : "text-foreground/80"} hover:text-underline`}>
-              <ArrowLeft className="h-4 w-4" /> Back to search
-            </Link>
+            <div
+              className={
+                imageUrl
+                  ? "w-fit rounded-full bg-background/70 px-4 py-2 shadow-lg backdrop-blur-sm"
+                  : undefined
+              }
+            >
+              <Link to={queryString ? `/results?${queryString}` : "/"} className={`inline-flex items-center gap-2 text-sm font-semibold underline-offset-4 hover:underline text-foreground/80 hover:text-underline`}>
+                <ArrowLeft className="h-4 w-4" /> Back to search
+              </Link>
+            </div>
           </div>
           <div className={`container mx-auto px-10 pb-40 ${imageUrl ? "text-white" : ""}`}>
             <div className="mt-6 flex items-start gap-5">
