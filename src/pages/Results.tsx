@@ -1,10 +1,11 @@
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Bus, Train, Car, Clock, Euro, Zap, PiggyBank, Sparkles, ArrowLeft,
   Fuel, Ticket, CarTaxiFront, AlertTriangle, Info, CloudRain, Map as MapIcon,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { LANDMARKS, geocode, getWikiLandmarkImage, type GeocodeResult, type Coords, type Landmark } from "@/lib/bulgaria-data";
 import { decodePolyline, distanceToPathKm, distanceToSegmentKm, roadKm } from "@/lib/geo";
@@ -200,7 +201,7 @@ export default function ResultsPage() {
   const toLabel = base?.toName ?? to;
 
   useDocumentMeta(
-    "Routique",
+    fromLabel && toLabel ? `${fromLabel} - ${toLabel}` : "Routique",
     `Compare bus, train and car routes from ${fromLabel || "your start"} to ${toLabel || "your destination"} in Bulgaria.`,
   );
 
@@ -231,7 +232,8 @@ export default function ResultsPage() {
       });
     },
     staleTime: 1000 * 60 * 5,
-    refetchInterval: 1000 * 60 * 10,
+    // If no source answered (e.g. TomTom and Open-Meteo both timed out), try again soon.
+    refetchInterval: (query) => (query.state.data?.checked.length === 0 ? 15_000 : 1000 * 60 * 10),
   });
 
   const bdzQuery = useQuery<BdzScheduleResult>({
@@ -550,17 +552,65 @@ function AlertsList({
   );
   const alerts = [...trainAlerts, ...(data?.alerts ?? [])];
   const checked = [...(trainsChecked ? ["BDŽ live trains"] : []), ...(data?.checked ?? [])];
+
+  // Show alerts a page at a time; alerts refresh, so keep the page in range if the list shrinks.
+  const [page, setPage] = useState(0);
+  const pages = Math.max(1, Math.ceil(alerts.length / ALERTS_PER_PAGE));
+  const current = Math.min(page, pages - 1);
+  const first = current * ALERTS_PER_PAGE;
+  const shown = alerts.slice(first, first + ALERTS_PER_PAGE);
+
+  // Keep the arrows where they are when a later page has fewer (or shorter) alerts: the card
+  // area keeps the height of the tallest page shown so far.
+  const listRef = useRef<HTMLDivElement>(null);
+  const [listMinHeight, setListMinHeight] = useState(0);
+  useLayoutEffect(() => {
+    const h = listRef.current?.scrollHeight ?? 0;
+    if (h > listMinHeight) setListMinHeight(h);
+  });
+
   if (alerts.length === 0) {
     if (isLoading) return note("Checking trains, traffic and weather along your route…");
     if (checked.length === 0 || (isError && !trainsChecked)) return note("Live alerts are unavailable right now.");
     return note(`No disruptions on this route right now. Checked: ${joinList(checked)}.`);
   }
+  const arrow =
+    "flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-card text-foreground transition-colors hover:bg-muted disabled:cursor-default disabled:opacity-40 disabled:hover:bg-card";
   return (
     <div className="space-y-3">
-      {alerts.map((a, i) => <AlertCard key={i} alert={a} />)}
+      <div ref={listRef} className="space-y-3" style={pages > 1 ? { minHeight: listMinHeight } : undefined}>
+        {shown.map((a, i) => <AlertCard key={first + i} alert={a} />)}
+      </div>
+      {pages > 1 && (
+        <div className="flex items-center justify-end gap-2">
+          <span className="mr-1 text-xs text-muted-foreground tabular-nums">
+            {shown.length > 1 ? `${first + 1}–${first + shown.length}` : first + 1} of {alerts.length}
+          </span>
+          <button
+            type="button"
+            className={arrow}
+            onClick={() => setPage(current - 1)}
+            disabled={current === 0}
+            aria-label="Previous alerts"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className={arrow}
+            onClick={() => setPage(current + 1)}
+            disabled={current >= pages - 1}
+            aria-label="Next alerts"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
+
+const ALERTS_PER_PAGE = 3;
 
 function joinList(items: string[]): string {
   return items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
