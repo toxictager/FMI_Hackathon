@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { MapPin, Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
+import { LogoMark } from "./Logo";
 
 export function Header() {
   const [dark, setDark] = useState(() => {
@@ -25,12 +26,7 @@ export function Header() {
     <div className="w-full px-6 pt-10">
       <div className="flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-primary-foreground"
-            style={{ background: "var(--gradient-hero)" }}
-          >
-            <MapPin className="h-5 w-5" strokeWidth={2.5} />
-          </div>
+          <LogoMark className="h-9 w-9" />
           <span className="font-display text-2xl font-extrabold tracking-tight text-foreground">Routique</span>
         </Link>
         <div className="flex items-center gap-4">

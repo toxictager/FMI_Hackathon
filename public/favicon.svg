@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <style>
+    .bg { fill: #2f8a6c; }
+    .route { stroke: #2f8a6c; }
+    .fg { fill: #f2fbf7; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #6fd3b0; }
+      .route { stroke: #6fd3b0; }
+      .fg { fill: #0b1121; }
+    }
+  </style>
+  <path class="route" d="M14 88 C30 88 34 70 50 70" fill="none" stroke-width="5" stroke-linecap="round" stroke-dasharray="2 9" opacity="0.65"/>
+  <path class="bg" d="M60 8a26 26 0 0 0-26 26c0 19 26 46 26 46s26-27 26-46A26 26 0 0 0 60 8z"/>
+  <circle class="fg" cx="60" cy="34" r="10"/>
+  <circle class="bg" cx="14" cy="88" r="6"/>
+</svg>
