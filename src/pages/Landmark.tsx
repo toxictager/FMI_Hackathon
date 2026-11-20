@@ -61,7 +61,7 @@ export default function LandmarkPage() {
                   : undefined
               }
             >
-              <Link to={queryString ? `/results?${queryString}` : "/"} className={`inline-flex items-center gap-2 text-sm font-semibold underline-offset-4 hover:underline ${imageUrl ? "text-white/80" : "text-foreground/80"} hover:text-underline`}>
+              <Link to={queryString ? `/results?${queryString}` : "/"} className={`inline-flex items-center gap-2 text-sm font-semibold underline-offset-4 hover:underline text-foreground/80 hover:text-underline`}>
                 <ArrowLeft className="h-4 w-4" /> Back to search
               </Link>
             </div>
