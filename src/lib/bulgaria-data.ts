@@ -1,25 +1,33 @@
-export interface Coords { lat: number; lng: number; }
+export const SAMPLE_CITIES: String[] = [
+  "sofia", "plovdiv", "varna", "burgas", "ruse", "stara zagora", "pleven",
+  "veliko tarnovo", "blagoevgrad", "shumen", "sliven", "pernik", "vidin",
+  "haskovo", "bansko", "razlog", "karlovo", "gorna oryahovitsa", "dobrich",
+  "kazanlak", "asenovgrad", "lovech", "yambol", "dimitrovgrad", "mezdra",
+];
 
-export const CITY_COORDS: Record<string, Coords> = {
-  sofia: { lat: 42.6977, lng: 23.3219 },
-  plovdiv: { lat: 42.1354, lng: 24.7453 },
-  varna: { lat: 43.2141, lng: 27.9147 },
-  burgas: { lat: 42.5048, lng: 27.4626 },
-  ruse: { lat: 43.8356, lng: 25.9657 },
-  "stara zagora": { lat: 42.4258, lng: 25.6345 },
-  pleven: { lat: 43.4170, lng: 24.6067 },
-  "veliko tarnovo": { lat: 43.0757, lng: 25.6172 },
-  bansko: { lat: 41.8378, lng: 23.4881 },
-  "sunny beach": { lat: 42.6877, lng: 27.7126 },
-  sozopol: { lat: 42.4180, lng: 27.6953 },
-  nesebar: { lat: 42.6593, lng: 27.7330 },
-  blagoevgrad: { lat: 42.0117, lng: 23.0897 },
-  shumen: { lat: 43.2706, lng: 26.9229 },
-  sliven: { lat: 42.6824, lng: 26.3225 },
-  pernik: { lat: 42.6051, lng: 23.0379 },
-  vidin: { lat: 43.9907, lng: 22.8728 },
-  haskovo: { lat: 41.9344, lng: 25.5556 },
-};
+export interface Coords {
+  lat: number;
+  lng: number;
+}
+
+export async function geocode(name: string): Promise<Coords> {
+  const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
+  url.searchParams.set("name", name);
+  url.searchParams.set("count", "1");
+  url.searchParams.set("country_code", "BG");
+  url.searchParams.set("language", "en");
+
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`Geocoding error ${res.status}`);
+
+  const json = (await res.json()) as {
+    results?: Array<{ latitude: number; longitude: number }>;
+  };
+  const hit = json.results?.[0];
+  if (!hit) throw new Error(`Could not find "${name}"`);
+
+  return { lat: hit.latitude, lng: hit.longitude };
+}
 
 export interface Landmark {
   name: string;

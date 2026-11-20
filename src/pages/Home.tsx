@@ -1,11 +1,11 @@
 import { useNavigate } from "react-router-dom";
 import { useState, type FormEvent } from "react";
 import { ArrowRight } from "lucide-react";
-import { CITY_COORDS } from "@/lib/bulgaria-data";
+import { SAMPLE_CITIES } from "@/lib/bulgaria-data";
 import { Header, Footer } from "@/components/SiteChrome";
 import { useDocumentMeta } from "@/lib/useDocumentMeta";
 
-const CITIES = Object.keys(CITY_COORDS).map((k) =>
+const CITIES = Array.from(SAMPLE_CITIES, (k) =>
   k.replace(/\b\w/g, (c) => c.toUpperCase()),
 );
 

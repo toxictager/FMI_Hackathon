@@ -6,7 +6,7 @@ import {
   Bus, Train, Car, Clock, Euro, Zap, PiggyBank, Sparkles, ArrowLeft,
   Fuel, Ticket, CarTaxiFront, AlertTriangle, Info, CloudRain, Map as MapIcon,
 } from "lucide-react";
-import { LANDMARKS, CITY_COORDS, getWikiLandmarkImage, type Coords, type Landmark } from "@/lib/bulgaria-data";
+import { LANDMARKS, geocode, getWikiLandmarkImage, type Coords, type Landmark } from "@/lib/bulgaria-data";
 import { decodePolyline, distanceToPathKm, distanceToSegmentKm, roadKm } from "@/lib/geo";
 import { postJson } from "@/lib/api";
 import type { BdzDeparture, BdzScheduleResult, DirectionsResult } from "@/lib/types";
@@ -36,11 +36,15 @@ function hashStr(s: string) {
   let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return Math.abs(h);
 }
-function lookupCoords(name: string): Coords | null {
-  return CITY_COORDS[name.trim().toLowerCase()] ?? null;
+async function lookupCoords(name: string): Promise<Coords | null> {
+  try {
+    return await geocode(name);
+  } catch {
+    return null; // not found or request failed
+  }
 }
 
-  interface ModeOption {
+interface ModeOption {
   mode: Mode;
   totalMinutes: number;
   cost: number;
@@ -188,13 +192,26 @@ export default function ResultsPage() {
     `Compare bus, train and car routes from ${from || "your start"} to ${to || "your destination"} in Bulgaria.`,
   );
 
+  const coordsQuery = useQuery({
+    queryKey: ["coords", from, to],
+    enabled: !!from && !!to,
+    queryFn: async () => {
+      const [fromCoords, toCoords] = await Promise.all([
+        lookupCoords(from),
+        lookupCoords(to),
+      ]);
+      if (!fromCoords || !toCoords) return null; // town not found
+      return { fromCoords, toCoords };
+    },
+    staleTime: Infinity, // town coordinates never change
+  });
+
   const base = useMemo(() => {
-    const fromCoords = lookupCoords(from);
-    const toCoords = lookupCoords(to);
-    if (!fromCoords || !toCoords) return null;
+    const coords = coordsQuery.data;
+    if (!coords) return null;
     const seed = hashStr(from.toLowerCase() + "→" + to.toLowerCase());
-    return { fromCoords, toCoords, seed };
-  }, [from, to]);
+    return { ...coords, seed };
+  }, [coordsQuery.data, from, to]);
 
   const directionsQuery = useQuery<DirectionsResult>({
     queryKey: ["directions", from, to],
@@ -263,18 +280,25 @@ export default function ResultsPage() {
       </div>
 
       <section className="mx-auto max-w-6xl px-6 py-10">
-        {!from || !to ? (
-          <EmptyState />
-        ) : !trip ? (
-          <div className="rounded-3xl border border-border bg-card p-8 text-center">
-            <p className="text-foreground">
-              We don't have coordinates for <strong>{from}</strong> or <strong>{to}</strong> yet.
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Try a major Bulgarian city from the home page.
-            </p>
-          </div>
-        ) : (
+      {!from || !to ? (
+        <EmptyState />
+      ) : coordsQuery.isLoading ? (
+        <div className="rounded-3xl border border-border bg-card p-8 text-center">
+          <p className="text-muted-foreground">
+            Finding <strong className="text-foreground">{from}</strong> and{" "}
+            <strong className="text-foreground">{to}</strong>…
+          </p>
+        </div>
+      ) : !trip ? (
+        <div className="rounded-3xl border border-border bg-card p-8 text-center">
+          <p className="text-foreground">
+            We couldn't find <strong>{from}</strong> or <strong>{to}</strong>.
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Check the spelling or try a major Bulgarian city from the home page.
+          </p>
+        </div>
+      ) : (
           <div className="space-y-14">
             <div className="flex items-baseline justify-between gap-4 flex-wrap">
               <h1 className="font-display text-3xl font-bold text-foreground sm:text-5xl">
