@@ -101,11 +101,17 @@
   --sidebar-ring: oklch(0.704 0.04 256.788);
   /* Route cards that win more than one category: calm forest green on the cream background. */
   --win: oklch(0.52 0.1 155);
+  /* Route-pin logo: teal pin with a pale centre. */
+  --logo-bg: #2f8a6c;
+  --logo-fg: #f2fbf7;
 }
 
 .dark {
   /* Brighter emerald reads well on the dark background. */
   --win: oklch(0.765 0.177 163.223);
+  /* Route-pin logo: lighter mint pin with a centre in the page's dark colour. */
+  --logo-bg: #6fd3b0;
+  --logo-fg: #0b1121;
   --background: oklch(0.129 0.042 264.695);
   --foreground: oklch(0.984 0.003 247.858);
   --card: oklch(0.208 0.042 265.755);
@@ -167,6 +173,15 @@
 .font-unified .font-display {
   font-family: "Inter", system-ui, sans-serif;
   letter-spacing: -0.01em;
+}
+
+/* The "Routique" name in the header is part of the logo: same serif on every page,
+   including pages that switch their text to Inter with .font-unified. */
+.brand-wordmark,
+.font-unified .brand-wordmark {
+  font-family: "Fraunces", "Times New Roman", serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.02em;
 }
 
 /* Route cards whose winning mode also wins another card: glow green on hover. */

@@ -9,7 +9,7 @@ import {
 import { LANDMARKS, geocode, getWikiLandmarkImage, type GeocodeResult, type Coords, type Landmark } from "@/lib/bulgaria-data";
 import { decodePolyline, distanceToPathKm, distanceToSegmentKm, roadKm } from "@/lib/geo";
 import { postJson } from "@/lib/api";
-import type { BdzDeparture, BdzScheduleResult, DirectionsResult } from "@/lib/types";
+import type { AlertsResult, BdzDeparture, BdzScheduleResult, DirectionsResult, TripAlert } from "@/lib/types";
 import { RouteMap } from "@/components/RouteMap";
 import { Header, Footer } from "@/components/SiteChrome";
 import { useDocumentMeta } from "@/lib/useDocumentMeta";
@@ -27,8 +27,6 @@ interface RouteOption {
   note: string;
   breakdown: { label: string; amount: number; icon: typeof Fuel }[];
 }
-
-interface Alert { level: "info" | "warning" | "delay"; title: string; body: string }
 
 const MAX_LANDMARK_KM = 30;
 
@@ -134,18 +132,6 @@ function generateRoutes(seed: number, km: number, realDriveMin?: number, trainMi
   }));
 }
 
-function generateAlerts(seed: number): Alert[] {
-  const pool: Alert[] = [
-    { level: "delay",   title: "Train BV 8612 delayed 25 min", body: "BDŽ reports a signaling issue near Mezdra. Connections may be affected." },
-    { level: "warning", title: "Heavy traffic on A1 near Trakia", body: "Average speeds dropping to 35 km/h between Plovdiv and Stara Zagora." },
-    { level: "info",    title: "Bus terminal change", body: "Departures temporarily moved to Serdika Center bay 4." },
-    { level: "warning", title: "Vignette checkpoint active", body: "Road police are inspecting vignettes on the Hemus highway." },
-    { level: "delay",   title: "Rain expected in the Balkan range", body: "Plan extra time on mountain passes after 6pm." },
-    { level: "info",    title: "Discounted weekend train fares", body: "BDŽ offers 30% off return tickets through Sunday." },
-  ];
-  return [0,1,2].map((i) => pool[(seed + i * 7) % pool.length]);
-}
-
 function landmarksAlongRoute(
   from: Coords,
   to: Coords,
@@ -223,6 +209,29 @@ export default function ResultsPage() {
     enabled: !!base,
     queryFn: () => postJson<DirectionsResult>("/api/directions", { from: base!.fromCoords, to: base!.toCoords }),
     staleTime: 1000 * 60 * 60,
+    // Live alerts wait for this; without a Google key it fails every time, so don't keep retrying.
+    retry: 1,
+  });
+
+  // Real alerts: Google traffic delay + Open-Meteo weather along the route. Waits for the
+  // directions call (successful or not) so it can use the route line and drive times.
+  const alertsQuery = useQuery<AlertsResult>({
+    queryKey: ["alerts", from, to, directionsQuery.dataUpdatedAt],
+    enabled: !!base && !directionsQuery.isLoading,
+    queryFn: () => {
+      const dir = directionsQuery.data;
+      return postJson<AlertsResult>("/api/alerts", {
+        from: base!.fromCoords,
+        to: base!.toCoords,
+        fromName: from,
+        toName: to,
+        polyline: dir?.polyline,
+        durationMin: dir?.durationMin,
+        typicalDurationMin: dir?.typicalDurationMin,
+      });
+    },
+    staleTime: 1000 * 60 * 5,
+    refetchInterval: 1000 * 60 * 10,
   });
 
   const bdzQuery = useQuery<BdzScheduleResult>({
@@ -230,6 +239,8 @@ export default function ResultsPage() {
     enabled: !!from && !!to,
     queryFn: () => postJson<BdzScheduleResult>("/api/bdz", { from, to }),
     staleTime: 1000 * 60 * 10,
+    // The timetable is cached on BDŽ's side; re-asking mainly refreshes live delays.
+    refetchInterval: 1000 * 60 * 2,
   });
 
   // Prices load after the timetable. BDŽ is slow the first time it computes a fare,
@@ -249,6 +260,27 @@ export default function ResultsPage() {
   // Stop showing "Loading price…" once we've given up (or the request failed outright).
   const pricesGaveUp = pricesQuery.isError || (priceTries >= MAX_PRICE_TRIES && !pricesQuery.isFetching);
 
+  // Prices come from the slower query; live delays from the timetable query, which refreshes
+  // every 2 minutes. Combine both so neither goes stale.
+  const schedule = useMemo(() => {
+    const base = pricesQuery.data ?? bdzQuery.data;
+    if (!base || !pricesQuery.data || !bdzQuery.data) return base;
+    const live = new Map(bdzQuery.data.departures.map((d) => [`${d.departTime}|${d.trainName}`, d]));
+    return {
+      ...base,
+      departures: base.departures.map((d) => {
+        const l = live.get(`${d.departTime}|${d.trainName}`);
+        return l ? { ...d, delayMin: l.delayMin, isDelayed: l.isDelayed } : d;
+      }),
+    };
+  }, [pricesQuery.data, bdzQuery.data]);
+
+  const trainAlerts = useMemo(
+    () => (schedule ? trainDelayAlerts(schedule, from, to, bdzQuery.dataUpdatedAt) : []),
+    [schedule, from, to, bdzQuery.dataUpdatedAt],
+  );
+  const trainsChecked = !!schedule?.departures.some((d) => d.delayMin !== undefined);
+
   const trip = useMemo(() => {
     if (!base) return null;
     const dir = directionsQuery.data;
@@ -266,7 +298,6 @@ export default function ResultsPage() {
       pathLatLng: decoded ? (decoded.map((c) => [c.lat, c.lng]) as Array<[number, number]>) : undefined,
       pathCoords: decoded,
       routes: generateRoutes(base.seed, km, realDriveMin, trainMin),
-      alerts: generateAlerts(base.seed),
       landmarks: landmarksAlongRoute(base.fromCoords, base.toCoords, decoded),
     };
   }, [base, directionsQuery.data, bdzQuery.data]);
@@ -334,10 +365,14 @@ export default function ResultsPage() {
                 />
               </section>
               <section>
-                <SectionHeader icon={AlertTriangle} title="Live alerts" subtitle="Schedule changes & traffic now" />
-                <div className="space-y-3">
-                  {trip.alerts.map((a, i) => <AlertCard key={i} alert={a} />)}
-                </div>
+                <SectionHeader icon={AlertTriangle} title="Live alerts" subtitle="Trains, traffic and weather on your route" />
+                <AlertsList
+                  isLoading={alertsQuery.isLoading || directionsQuery.isLoading}
+                  isError={alertsQuery.isError}
+                  data={alertsQuery.data}
+                  trainAlerts={trainAlerts}
+                  trainsChecked={trainsChecked}
+                />
               </section>
             </div>
 
@@ -361,7 +396,7 @@ export default function ResultsPage() {
             <BdzScheduleSection
               isLoading={bdzQuery.isLoading}
               isError={bdzQuery.isError}
-              data={pricesQuery.data ?? bdzQuery.data}
+              data={schedule}
               pricesGaveUp={pricesGaveUp}
             />
           </div>
@@ -474,13 +509,71 @@ function SectionHeader({ icon: Icon, title, subtitle }: { icon: typeof MapIcon; 
   );
 }
 
-function AlertCard({ alert }: { alert: Alert }) {
+// Delays of 5+ min become alerts; smaller ones only show as a badge in the timetable.
+const TRAIN_ALERT_MIN = 5;
+
+function trainDelayAlerts(schedule: BdzScheduleResult, from: string, to: string, updatedAt: number): TripAlert[] {
+  return schedule.departures
+    .filter((d) => (d.delayMin ?? 0) >= TRAIN_ALERT_MIN)
+    .map((d) => ({
+      level: d.delayMin! >= 15 ? "delay" : "warning",
+      title: `Train ${d.trainName} running ${d.delayMin} min late`,
+      body: `The ${d.departTime} departure from ${from} towards ${to} is now expected at ${addMinutes(d.departTime, d.delayMin!)}.`,
+      source: "BDŽ live",
+      updatedAt: new Date(updatedAt || Date.now()).toISOString(),
+    }));
+}
+
+function addMinutes(hhmm: string, add: number): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  const total = (h * 60 + m + add) % (24 * 60);
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function AlertsList({
+  isLoading,
+  isError,
+  data,
+  trainAlerts,
+  trainsChecked,
+}: {
+  isLoading: boolean;
+  isError: boolean;
+  data: AlertsResult | undefined;
+  trainAlerts: TripAlert[];
+  trainsChecked: boolean;
+}) {
+  const note = (text: string) => (
+    <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground" style={{ boxShadow: "var(--shadow-card)" }}>
+      {text}
+    </div>
+  );
+  const alerts = [...trainAlerts, ...(data?.alerts ?? [])];
+  const checked = [...(trainsChecked ? ["BDŽ live trains"] : []), ...(data?.checked ?? [])];
+  if (alerts.length === 0) {
+    if (isLoading) return note("Checking trains, traffic and weather along your route…");
+    if (checked.length === 0 || (isError && !trainsChecked)) return note("Live alerts are unavailable right now.");
+    return note(`No disruptions on this route right now. Checked: ${joinList(checked)}.`);
+  }
+  return (
+    <div className="space-y-3">
+      {alerts.map((a, i) => <AlertCard key={i} alert={a} />)}
+    </div>
+  );
+}
+
+function joinList(items: string[]): string {
+  return items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+function AlertCard({ alert }: { alert: TripAlert }) {
   const config = {
     delay:   { Icon: Clock,         dot: "bg-primary",   label: "Delay" },
     warning: { Icon: AlertTriangle, dot: "bg-accent",    label: "Warning" },
     info:    { Icon: Info,          dot: "bg-secondary", label: "Info" },
   }[alert.level];
-  const { Icon } = config;
+  const Icon = alert.source.includes("Meteo") ? CloudRain : alert.source.includes("BDŽ") ? Train : config.Icon;
+  const time = new Date(alert.updatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   return (
     <article className="rounded-2xl border border-border bg-card p-4" style={{ boxShadow: "var(--shadow-card)" }}>
       <div className="flex items-start gap-3">
@@ -491,7 +584,7 @@ function AlertCard({ alert }: { alert: Alert }) {
           <div className="flex items-center gap-2">
             <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {config.label} · live
+              {config.label} · {alert.source} · {time}
             </span>
           </div>
           <h4 className="mt-1 font-semibold text-foreground">{alert.title}</h4>
@@ -617,6 +710,15 @@ function BdzScheduleSection({
               <div>
                 <div className="font-display text-lg font-bold text-foreground tabular-nums">
                   {d.departTime} <span className="text-muted-foreground">→</span> {d.arriveTime}
+                  {d.delayMin !== undefined && (
+                    d.delayMin > 0 ? (
+                      <span className="ml-2 align-middle rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                        +{d.delayMin} min late
+                      </span>
+                    ) : (
+                      <span className="ml-2 align-middle text-[11px] font-medium text-muted-foreground">on time</span>
+                    )
+                  )}
                 </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
                   {d.trainName}
@@ -641,9 +743,6 @@ function BdzScheduleSection({
                 <div className="flex flex-wrap items-center justify-end gap-1.5">
                   {d.hasSecondClass && <ClassFare label="2nd" price={d.priceSecondClass} />}
                   {d.hasFirstClass && <ClassFare label="1st" price={d.priceFirstClass} />}
-                  {d.isDelayed && (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">delayed</span>
-                  )}
                 </div>
               </div>
             </li>
