@@ -199,8 +199,9 @@ export async function tomtomIncidents(path: Coords[]): Promise<Incident[] | null
       );
       if (nearEnds && !numbered) continue;
       const delayMin = Math.round((p.delay ?? 0) / 60);
-      // Tiny slowdowns on unnumbered streets aren't worth an alert.
-      if (!numbered && p.iconCategory === 6 && delayMin < 3) continue;
+      // On unnumbered streets, only incidents that actually slow this route matter: a closed
+      // side street with no delay is one the route already avoids. Tiny jams aren't worth it either.
+      if (!numbered && (delayMin === 0 || (p.iconCategory === 6 && delayMin < 3))) continue;
       out.push({
         kind: ICON_KIND[p.iconCategory] ?? "Traffic incident",
         description: p.events?.[0]?.description ?? ICON_KIND[p.iconCategory] ?? "Incident",

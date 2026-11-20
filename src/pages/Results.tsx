@@ -209,6 +209,8 @@ export default function ResultsPage() {
     enabled: !!base,
     queryFn: () => postJson<DirectionsResult>("/api/directions", { from: base!.fromCoords, to: base!.toCoords }),
     staleTime: 1000 * 60 * 60,
+    // Live alerts wait for this; without a Google key it fails every time, so don't keep retrying.
+    retry: 1,
   });
 
   // Real alerts: Google traffic delay + Open-Meteo weather along the route. Waits for the
