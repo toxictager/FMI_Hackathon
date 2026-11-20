@@ -404,7 +404,7 @@ function RouteCard({ route }: { route: RouteOption }) {
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <CatIcon className="h-3.5 w-3.5" />{meta.tagline}
           </div>
-          <h3 className={`mt-1 text-2xl font-bold ${isShared ? "text-emerald-500 dark:text-emerald-400" : "text-foreground"}`}>
+          <h3 className={`mt-1 text-2xl font-bold ${isShared ? "text-[var(--win)]" : "text-foreground"}`}>
             {meta.label}
           </h3>
         </div>
@@ -419,7 +419,7 @@ function RouteCard({ route }: { route: RouteOption }) {
       <p className="mt-5 text-sm text-muted-foreground">
         <span className="font-medium text-foreground">{MODE_LABEL[route.mode]}</span> · {route.note}
         {route.sharedWith.length > 0 && (
-          <span className="mt-2 block text-xs font-semibold text-primary">
+          <span className="mt-2 block text-xs font-semibold text-foreground">
             Also the {route.sharedWith.map((c) => CAT_META[c].label.toLowerCase()).join(" and ")}
           </span>
         )}
