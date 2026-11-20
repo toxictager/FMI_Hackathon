@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
   Bus, Train, Car, Clock, Euro, Zap, PiggyBank, Sparkles, ArrowLeft,
@@ -199,6 +199,23 @@ export default function ResultsPage() {
     staleTime: 1000 * 60 * 10,
   });
 
+  // Prices load after the timetable. BDŽ is slow the first time it computes a fare,
+  // so while some are still pending we ask again every few seconds, up to a limit.
+  const MAX_PRICE_TRIES = 6;
+  const pricesQuery = useQuery<BdzScheduleResult>({
+    queryKey: ["bdz-prices", from, to],
+    enabled: !!bdzQuery.data?.supported && bdzQuery.data.departures.length > 0,
+    queryFn: () => postJson<BdzScheduleResult>("/api/bdz/prices", { from, to }),
+    staleTime: 1000 * 60 * 10,
+    refetchInterval: (query) => {
+      const pending = query.state.data?.departures.some((d) => d.priceStatus === "pending");
+      return pending && query.state.dataUpdateCount < MAX_PRICE_TRIES ? 3000 : false;
+    },
+  });
+  const priceTries = useQueryClient().getQueryState(["bdz-prices", from, to])?.dataUpdateCount ?? 0;
+  // Stop showing "Loading price…" once we've given up (or the request failed outright).
+  const pricesGaveUp = pricesQuery.isError || (priceTries >= MAX_PRICE_TRIES && !pricesQuery.isFetching);
+
   const trip = useMemo(() => {
     if (!base) return null;
     const dir = directionsQuery.data;
@@ -304,7 +321,8 @@ export default function ResultsPage() {
             <BdzScheduleSection
               isLoading={bdzQuery.isLoading}
               isError={bdzQuery.isError}
-              data={bdzQuery.data}
+              data={pricesQuery.data ?? bdzQuery.data}
+              pricesGaveUp={pricesGaveUp}
             />
           </div>
         )}
@@ -499,10 +517,12 @@ function BdzScheduleSection({
   isLoading,
   isError,
   data,
+  pricesGaveUp,
 }: {
   isLoading: boolean;
   isError: boolean;
   data: { supported: boolean; fromName?: string; toName?: string; date?: string; departures: BdzDeparture[]; error?: string } | undefined;
+  pricesGaveUp: boolean;
 }) {
   if (isLoading) {
     return (
@@ -542,7 +562,7 @@ function BdzScheduleSection({
       </section>
     );
   }
-  const next = data.departures.slice(0, 6);
+  const next = data.departures;
   return (
     <section>
       <SectionHeader
@@ -553,13 +573,14 @@ function BdzScheduleSection({
       <div className="overflow-hidden rounded-2xl border border-border bg-card" style={{ boxShadow: "var(--shadow-card)" }}>
         <ul className="divide-y divide-border">
           {next.map((d, i) => (
-            <li key={`${d.trainName}-${d.departTime}-${i}`} className="grid grid-cols-[1fr_auto] items-center gap-4 px-5 py-4 sm:grid-cols-[1.2fr_1fr_auto]">
+            <li key={`${d.trainName}-${d.departTime}-${i}`} className="grid grid-cols-[1fr_auto] items-center gap-4 px-5 py-4 sm:grid-cols-[1fr_5rem_14rem]">
               <div>
                 <div className="font-display text-lg font-bold text-foreground tabular-nums">
                   {d.departTime} <span className="text-muted-foreground">→</span> {d.arriveTime}
                 </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
-                  {d.trainName} · {d.distanceKm} km
+                  {d.trainName}
+                  {d.distanceKm > 0 ? ` · ${d.distanceKm} km` : ""}
                   {d.transfers > 0 ? ` · ${d.transfers} transfer${d.transfers > 1 ? "s" : ""}` : " · direct"}
                 </div>
               </div>
@@ -567,16 +588,23 @@ function BdzScheduleSection({
                 <Clock className="mr-1 inline h-3.5 w-3.5 text-muted-foreground" />
                 {d.totalTime}
               </div>
-              <div className="flex flex-wrap items-center justify-end gap-1.5">
-                {d.hasFirstClass && (
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground">1st</span>
-                )}
-                {d.hasSecondClass && (
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground">2nd</span>
-                )}
-                {d.isDelayed && (
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">delayed</span>
-                )}
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-xs text-muted-foreground/80">
+                  {d.priceSecondClass !== undefined || d.priceFirstClass !== undefined
+                    ? "Adult price"
+                    : d.priceStatus === "none"
+                      ? "No online price · buy at the station"
+                      : pricesGaveUp
+                        ? "Price unavailable right now"
+                        : "Loading price…"}
+                </span>
+                <div className="flex flex-wrap items-center justify-end gap-1.5">
+                  {d.hasSecondClass && <ClassFare label="2nd" price={d.priceSecondClass} />}
+                  {d.hasFirstClass && <ClassFare label="1st" price={d.priceFirstClass} />}
+                  {d.isDelayed && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">delayed</span>
+                  )}
+                </div>
               </div>
             </li>
           ))}
@@ -586,5 +614,16 @@ function BdzScheduleSection({
         Source: razpisanie.bdz.bg · prices on the card above are estimates; click БДЖ to book.
       </p>
     </section>
+  );
+}
+
+function ClassFare({ label, price }: { label: string; price?: number }) {
+  return (
+    <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-foreground">
+      {label}
+      {price !== undefined && (
+        <span className="font-medium normal-case tracking-normal tabular-nums">&nbsp;: {price.toFixed(2)} €</span>
+      )}
+    </span>
   );
 }

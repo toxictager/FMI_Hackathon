@@ -20,6 +20,11 @@ export interface BdzDeparture {
   hasFirstClass: boolean;
   hasSecondClass: boolean;
   isDelayed: boolean;
+  /** Regular adult fare in EUR; missing when that class isn't sold or BDŽ didn't return a price. */
+  priceSecondClass?: number;
+  priceFirstClass?: number;
+  /** ok: fare found; none: BDŽ sells no regular online fare; pending: BDŽ hasn't answered yet. */
+  priceStatus?: "ok" | "none" | "pending";
 }
 
 export interface BdzScheduleResult {

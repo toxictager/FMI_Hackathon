@@ -1,0 +1,13 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# React Router: send unknown paths to the app (functions with a `path` config take priority).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
