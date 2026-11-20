@@ -215,8 +215,9 @@ export default function ResultsPage() {
     retry: 1,
   });
 
-  // Real alerts: Google traffic delay + Open-Meteo weather along the route. Waits for the
-  // directions call (successful or not) so it can use the route line and drive times.
+  // Real alerts: TomTom traffic + Open-Meteo weather along the route (train delays are added
+  // below). Waits for the directions call so the Google route line can place the weather
+  // points if TomTom is unavailable.
   const alertsQuery = useQuery<AlertsResult>({
     queryKey: ["alerts", from, to, directionsQuery.dataUpdatedAt],
     enabled: !!base && !directionsQuery.isLoading,
@@ -229,7 +230,6 @@ export default function ResultsPage() {
         toName: to,
         polyline: dir?.polyline,
         durationMin: dir?.durationMin,
-        typicalDurationMin: dir?.typicalDurationMin,
       });
     },
     staleTime: 1000 * 60 * 5,

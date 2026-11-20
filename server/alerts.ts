@@ -1,6 +1,6 @@
 // Live alerts for a trip, built only from real data:
-//  - traffic: TomTom live traffic delay + incidents (accidents, closures, roadworks, jams)
-//    when TOMTOM_API_KEY is set; otherwise Google's traffic-aware drive time
+//  - traffic: TomTom live traffic delay + incidents (accidents, closures, roadworks, jams);
+//    needs TOMTOM_API_KEY, otherwise there are no traffic alerts
 //  - weather: Open-Meteo forecast at points along the route, at the hour you'd pass each one
 // (Train delays are added on the client from the BDŽ timetable data.)
 // Nothing here is invented; with no disruptions the list is simply empty.
@@ -24,12 +24,10 @@ export interface AlertsInput {
   to: Coords;
   fromName: string;
   toName: string;
-  /** Google encoded polyline of the drive; a straight line is used without it. */
+  /** Google encoded polyline of the drive, used for weather points if TomTom is unavailable. */
   polyline?: string;
-  /** Drive time with current traffic, in minutes. */
+  /** Google drive time in minutes, used to time the weather check if TomTom is unavailable. */
   durationMin?: number;
-  /** Drive time without traffic, in minutes (Google's static duration). */
-  typicalDurationMin?: number;
 }
 
 export interface AlertsResult {
@@ -43,19 +41,17 @@ const TRAFFIC_ALERT_MIN = 10;
 
 function trafficAlert(
   input: AlertsInput,
-  durationMin: number | undefined,
-  typicalDurationMin: number | undefined,
-  source: string,
+  durationMin: number,
+  typicalDurationMin: number,
   now: string,
 ): TripAlert | null {
-  if (durationMin === undefined || typicalDurationMin === undefined) return null;
   const extra = Math.round(durationMin - typicalDurationMin);
   if (extra < TRAFFIC_ALERT_MIN) return null;
   return {
     level: extra >= 25 ? "delay" : "warning",
     title: `Traffic: +${extra} min by car right now`,
     body: `Driving ${input.fromName} → ${input.toName} takes about ${fmtDuration(durationMin)} with current traffic, instead of the usual ${fmtDuration(typicalDurationMin)}.`,
-    source,
+    source: "TomTom traffic",
     updatedAt: now,
   };
 }
@@ -291,19 +287,19 @@ export async function getAlerts(input: AlertsInput): Promise<AlertsResult> {
   const alerts: TripAlert[] = [];
   const checked: string[] = [];
 
-  // TomTom (if configured) gives the route line and live traffic; Google's values are the fallback.
+  // Traffic comes only from TomTom, which also gives the route line. Google's route line is
+  // just a fallback for placing the weather points.
   const tt = await tomtomRoute(input.from, input.to);
   const googlePath = input.polyline
     ? decodePolyline(input.polyline).map(([lat, lng]) => ({ lat, lng }))
     : undefined;
   const path: Coords[] = tt?.path ?? googlePath ?? [input.from, input.to];
 
-  const traffic = tt
-    ? trafficAlert(input, tt.durationMin, tt.typicalDurationMin, "TomTom traffic", now)
-    : trafficAlert(input, input.durationMin, input.typicalDurationMin, "Google traffic", now);
-  if (traffic) alerts.push(traffic);
-  if (tt) checked.push("TomTom traffic");
-  else if (input.durationMin !== undefined && input.typicalDurationMin !== undefined) checked.push("Google traffic");
+  if (tt) {
+    const traffic = trafficAlert(input, tt.durationMin, tt.typicalDurationMin, now);
+    if (traffic) alerts.push(traffic);
+    checked.push("TomTom traffic");
+  }
 
   // Without a real drive time, estimate it (~75 km/h average on Bulgarian roads).
   const driveMin =

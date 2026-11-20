@@ -1,4 +1,4 @@
-// Netlify Function: the hosted site's /api/alerts (Google traffic + Open-Meteo weather).
+// Netlify Function: the hosted site's /api/alerts (TomTom traffic + Open-Meteo weather).
 import { getAlerts } from "../../server/alerts";
 import { alertsInput } from "../../server/schemas";
 

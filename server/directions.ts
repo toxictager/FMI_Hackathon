@@ -2,10 +2,7 @@
 
 export interface DirectionsResult {
   distanceKm: number;
-  /** Drive time with current traffic. */
   durationMin: number;
-  /** Usual drive time without traffic; the gap to durationMin is the traffic delay. */
-  typicalDurationMin: number;
   polyline: string;
   status: string;
 }
@@ -27,7 +24,7 @@ export async function getDirections(input: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": key,
         "X-Goog-FieldMask":
-          "routes.distanceMeters,routes.duration,routes.staticDuration,routes.polyline.encodedPolyline",
+          "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline",
       },
       body: JSON.stringify({
         origin: {
@@ -41,8 +38,7 @@ export async function getDirections(input: {
           },
         },
         travelMode: "DRIVE",
-        // Traffic-aware timing, so live alerts can report traffic delays.
-        routingPreference: "TRAFFIC_AWARE",
+        // Live traffic comes from TomTom (server/tomtom.ts), not Google.
         regionCode: "BG",
       }),
     },
@@ -63,7 +59,6 @@ export async function getDirections(input: {
     routes?: Array<{
       distanceMeters?: number;
       duration?: string; // e.g. "1234s"
-      staticDuration?: string;
       polyline?: { encodedPolyline: string };
     }>;
   };
@@ -75,12 +70,10 @@ export async function getDirections(input: {
 
   const meters = route.distanceMeters ?? 0;
   const seconds = parseInt(route.duration ?? "0", 10); // "1234s" -> 1234
-  const staticSeconds = parseInt(route.staticDuration ?? route.duration ?? "0", 10);
 
   return {
     distanceKm: Math.round(meters / 100) / 10,
     durationMin: Math.round(seconds / 60),
-    typicalDurationMin: Math.round(staticSeconds / 60),
     polyline: route.polyline.encodedPolyline,
     status: "OK",
   };

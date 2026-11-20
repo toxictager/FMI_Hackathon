@@ -14,7 +14,6 @@ export const alertsInput = z.object({
   toName: z.string().min(1).max(80),
   polyline: z.string().max(150_000).optional(),
   durationMin: minutes.optional(),
-  typicalDurationMin: minutes.optional(),
 });
 
 export const bdzInput = z.object({

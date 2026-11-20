@@ -2,10 +2,7 @@
 
 export interface DirectionsResult {
   distanceKm: number;
-  /** Drive time with current traffic. */
   durationMin: number;
-  /** Usual drive time without traffic. */
-  typicalDurationMin: number;
   polyline: string;
   status: string;
 }
