@@ -6,6 +6,7 @@ import {
   Bus, Train, Car, Clock, Euro, Zap, PiggyBank, Sparkles, ArrowLeft,
   Fuel, Ticket, CarTaxiFront, AlertTriangle, Info, CloudRain, Map as MapIcon,
 } from "lucide-react";
+import { Check } from "lucide-react";
 import { LANDMARKS, geocode, getWikiLandmarkImage, type GeocodeResult, type Coords, type Landmark } from "@/lib/bulgaria-data";
 import { decodePolyline, distanceToPathKm, distanceToSegmentKm, roadKm } from "@/lib/geo";
 import { postJson } from "@/lib/api";
@@ -543,9 +544,13 @@ function AlertsList({
   trainAlerts: TripAlert[];
   trainsChecked: boolean;
 }) {
-  const note = (text: string) => (
-    <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground" style={{ boxShadow: "var(--shadow-card)" }}>
-      {text}
+  const note = (text: string, clear: boolean = false) => (
+    <div
+      className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground"
+      style={{ boxShadow: "var(--shadow-card)" }}
+    >
+      {clear && <Check className="h-5 w-5 shrink-0 text-emerald-600" />}
+      <span>{text}</span>
     </div>
   );
   const alerts = [...trainAlerts, ...(data?.alerts ?? [])];
@@ -553,7 +558,7 @@ function AlertsList({
   if (alerts.length === 0) {
     if (isLoading) return note("Checking trains, traffic and weather along your route…");
     if (checked.length === 0 || (isError && !trainsChecked)) return note("Live alerts are unavailable right now.");
-    return note(`No disruptions on this route right now. Checked: ${joinList(checked)}.`);
+    return note(`No disruptions on this route right now, according to ${joinList(checked)}.`, true);
   }
   return (
     <div className="space-y-3">
