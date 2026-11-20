@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useDocumentMeta } from "@/lib/useDocumentMeta";
 
 export default function NotFound() {
-  useDocumentMeta("Page not found — Routique", "The page you're looking for doesn't exist.");
+  useDocumentMeta("Routique", "The page you're looking for doesn't exist.");
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">

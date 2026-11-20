@@ -11,7 +11,7 @@ const CITIES = Array.from(SAMPLE_CITIES, (k) =>
 
 export default function Home() {
   useDocumentMeta(
-    "Routique — Plan trips across Bulgaria",
+    "Routique",
     "Compare the fastest, cheapest and most convenient routes across Bulgaria by bus, train or car.",
   );
   const navigate = useNavigate();
