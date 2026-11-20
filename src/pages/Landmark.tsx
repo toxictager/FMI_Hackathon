@@ -13,7 +13,7 @@ export default function LandmarkPage() {
   const l = LANDMARKS.find((x) => x.slug === slug);
 
   useDocumentMeta(
-    l ? `${l.name} — Routique` : "Landmark — Routique",
+    "Routique",
     l ? `${l.description} Hours, ticket prices and travel tips for ${l.name}.` : "Landmark details on Routique.",
   );
 

@@ -201,7 +201,7 @@ export default function ResultsPage() {
   const toLabel = base?.toName ?? to;
 
   useDocumentMeta(
-    fromLabel && toLabel ? `${fromLabel} → ${toLabel} — Routique` : "Routes — Routique",
+    "Routique",
     `Compare bus, train and car routes from ${fromLabel || "your start"} to ${toLabel || "your destination"} in Bulgaria.`,
   );
 
