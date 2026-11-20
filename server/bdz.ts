@@ -1,5 +1,7 @@
 // Scrapes razpisanie.bdz.bg for train departures. Ported from the TanStack server function.
 
+import { getDepartureDelays } from "./bdzLive";
+
 const SUPPORTED_CITIES = new Set([
   "sofia", "plovdiv", "varna", "burgas", "ruse", "stara zagora", "pleven",
   "veliko tarnovo", "blagoevgrad", "shumen", "sliven", "pernik", "vidin",
@@ -20,6 +22,8 @@ export interface BdzDeparture {
   hasFirstClass: boolean;
   hasSecondClass: boolean;
   isDelayed: boolean;
+  /** Live delay in minutes from BDŽ's departures board (today's upcoming trains only). */
+  delayMin?: number;
   /** Regular adult fare in EUR; missing when that class isn't sold or the price lookup failed. */
   priceSecondClass?: number;
   priceFirstClass?: number;
@@ -42,6 +46,11 @@ function citySlug(name: string): string | null {
   const key = name.trim().toLowerCase();
   if (!SUPPORTED_CITIES.has(key)) return null;
   return key.replace(/\s+/g, "-");
+}
+
+// Today's date in Bulgaria as YYYY-MM-DD (the server itself may run in UTC).
+function sofiaToday(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(new Date());
 }
 
 function toDDMMYYYY(iso: string): string {
@@ -285,7 +294,7 @@ export async function getBdzSchedule(
   if (!fromSlug || !toSlug) {
     return { supported: false, departures: [] };
   }
-  const isoDate = input.date ?? new Date().toISOString().slice(0, 10);
+  const isoDate = input.date ?? sofiaToday();
   const ddmmyyyy = toDDMMYYYY(isoDate);
   const url = `https://razpisanie.bdz.bg/en/${fromSlug}/${toSlug}/${ddmmyyyy}`;
 
@@ -322,15 +331,27 @@ export async function getBdzSchedule(
       .map((c) => c.split(";")[0])
       .join("; ");
     const ctx = { data: routeData, token, cookie, cacheOnly: !withPrices || !token };
-    const fares = await Promise.all(parsed.map((dep) => fetchFare(ctx, dep)));
+    // Live delays only exist for today's trains, from the origin station's departures board.
+    const isToday = isoDate === sofiaToday();
+    const [fares, delays] = await Promise.all([
+      Promise.all(parsed.map((dep) => fetchFare(ctx, dep))),
+      isToday && routeData.route
+        ? getDepartureDelays(routeData.route.from).catch(() => null)
+        : Promise.resolve(null),
+    ]);
 
     const departures: BdzDeparture[] = parsed.map(
       ({ routeIndex, priceIndex: _pi, priceKey: _pk, ...dep }, i) => {
         const distanceKm = (routeIndex && distances.get(routeIndex)) || fallbackKm;
         const fare = plausibleFare(fares[i], distanceKm);
+        // "SU 10261" -> "10261": on transfer trips this is the first train, the one you board here.
+        const trainNumber = dep.trainName.match(/(\d+)\s*$/)?.[1];
+        const delayMin = trainNumber ? delays?.get(trainNumber) : undefined;
         return {
           ...dep,
           distanceKm,
+          delayMin,
+          isDelayed: (delayMin ?? 0) > 0,
           // The fare table is the reliable source for which classes the trip offers;
           // the card icons are missing on commuter and transfer trips.
           hasSecondClass: fare ? fare.hasSecond : dep.hasSecondClass,

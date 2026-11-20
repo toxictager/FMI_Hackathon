@@ -1,12 +1,14 @@
 import "dotenv/config";
 import path from "node:path";
 import express from "express";
+import { getAlerts } from "./alerts";
 import { getBdzSchedule } from "./bdz";
 import { getDirections } from "./directions";
-import { bdzInput, directionsInput } from "./schemas";
+import { alertsInput, bdzInput, directionsInput } from "./schemas";
 
 const app = express();
-app.use(express.json({ limit: "10kb" }));
+// /api/alerts carries the route's encoded polyline, which can be tens of KB on long trips.
+app.use(express.json({ limit: "200kb" }));
 
 app.post("/api/directions", async (req, res) => {
   const parsed = directionsInput.safeParse(req.body);
@@ -38,6 +40,15 @@ app.post("/api/bdz/prices", async (req, res) => {
     return;
   }
   res.json(await getBdzSchedule(parsed.data, { withPrices: true }));
+});
+
+app.post("/api/alerts", async (req, res) => {
+  const parsed = alertsInput.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid input" });
+    return;
+  }
+  res.json(await getAlerts(parsed.data));
 });
 
 // In production, serve the built React app from the same server.

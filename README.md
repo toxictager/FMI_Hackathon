@@ -5,7 +5,9 @@ A React 19 + TypeScript app for comparing bus, train and car routes across Bulga
 ## Setup
 
     npm install
-    cp .env.example .env      # then put your Google Maps key in .env
+    # create .env with your keys (both optional):
+    #   GOOGLE_MAPS_API_KEY=...
+    #   TOMTOM_API_KEY=...
 
 ## Run in development
 
@@ -21,9 +23,15 @@ Vite proxies `/api` to the API.
 
 ## Deploy to Netlify
 
-`netlify.toml` builds the app and serves `/api/bdz` and `/api/directions` as Netlify Functions
-(`netlify/functions/`), which reuse the code in `server/`. Set `GOOGLE_MAPS_API_KEY` under
-Site configuration → Environment variables. GitHub Pages can't run the API, so BDŽ and live
+`netlify.toml` builds the app and serves `/api/bdz`, `/api/bdz/prices`, `/api/directions` and
+`/api/alerts` as Netlify Functions (`netlify/functions/`), which reuse the code in `server/`.
+Set these under Site configuration → Environment variables:
+
+- `GOOGLE_MAPS_API_KEY`: live Google route and drive times
+- `TOMTOM_API_KEY`: live traffic delay and incidents (accidents, closures, roadworks) in Live alerts
+
+Both are optional: without them the app falls back to estimates, and Live alerts still show
+BDŽ train delays and Open-Meteo weather. GitHub Pages can't run the API, so BDŽ and live
 directions only work on a host that runs server code (Netlify, or `npm start` on a Node host).
 
 ## Structure

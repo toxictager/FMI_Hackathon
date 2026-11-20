@@ -2,9 +2,27 @@
 
 export interface DirectionsResult {
   distanceKm: number;
+  /** Drive time with current traffic. */
   durationMin: number;
+  /** Usual drive time without traffic. */
+  typicalDurationMin: number;
   polyline: string;
   status: string;
+}
+
+export interface TripAlert {
+  level: "info" | "warning" | "delay";
+  title: string;
+  body: string;
+  source: string;
+  /** ISO time the underlying data was fetched. */
+  updatedAt: string;
+}
+
+export interface AlertsResult {
+  alerts: TripAlert[];
+  /** Sources that were checked successfully. */
+  checked: string[];
 }
 
 export interface BdzDeparture {
@@ -20,6 +38,8 @@ export interface BdzDeparture {
   hasFirstClass: boolean;
   hasSecondClass: boolean;
   isDelayed: boolean;
+  /** Live delay in minutes from BDŽ's departures board (today's upcoming trains only). */
+  delayMin?: number;
   /** Regular adult fare in EUR; missing when that class isn't sold or BDŽ didn't return a price. */
   priceSecondClass?: number;
   priceFirstClass?: number;
