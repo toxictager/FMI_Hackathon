@@ -124,7 +124,7 @@ export default function ResultsPage() {
   const to = params.get("to") ?? "";
 
   useDocumentMeta(
-    from && to ? `${from} → ${to} — Travio` : "Routes — Travio",
+    from && to ? `${from} → ${to} — Routique` : "Routes — Routique",
     `Compare bus, train and car routes from ${from || "your start"} to ${to || "your destination"} in Bulgaria.`,
   );
 

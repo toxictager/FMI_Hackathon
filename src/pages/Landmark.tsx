@@ -10,8 +10,8 @@ export default function LandmarkPage() {
   const l = LANDMARKS.find((x) => x.slug === slug);
 
   useDocumentMeta(
-    l ? `${l.name} — Travio` : "Landmark — Travio",
-    l ? `${l.description} Hours, ticket prices and travel tips for ${l.name}.` : "Landmark details on Travio.",
+    l ? `${l.name} — Routique` : "Landmark — Routique",
+    l ? `${l.description} Hours, ticket prices and travel tips for ${l.name}.` : "Landmark details on Routique.",
   );
 
   if (!l) return <NotFound />;

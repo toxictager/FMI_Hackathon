@@ -31,7 +31,7 @@ export function Header() {
           >
             <MapPin className="h-5 w-5" strokeWidth={2.5} />
           </div>
-          <span className="font-display text-2xl font-extrabold tracking-tight text-foreground">Travio</span>
+          <span className="font-display text-2xl font-extrabold tracking-tight text-foreground">Routique</span>
         </Link>
         <div className="flex items-center gap-4">
           <span className="hidden text-sm text-muted-foreground sm:block">Bulgaria, end to end</span>
@@ -51,7 +51,7 @@ export function Header() {
 export function Footer() {
   return (
     <footer className="border-t border-border py-8 text-center text-xs text-muted-foreground">
-      Travio · Estimates only · Built for travelers in Bulgaria
+      Routique · Estimates only · Built for travelers in Bulgaria
     </footer>
   );
 }

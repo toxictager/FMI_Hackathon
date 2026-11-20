@@ -1,4 +1,4 @@
-# Travio (React + Vite + Express)
+# Routique (React + Vite + Express)
 
 A React 19 + TypeScript app for comparing bus, train and car routes across Bulgaria.
 

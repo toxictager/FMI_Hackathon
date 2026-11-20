@@ -11,7 +11,7 @@ const CITIES = Object.keys(CITY_COORDS).map((k) =>
 
 export default function Home() {
   useDocumentMeta(
-    "Travio — Plan trips across Bulgaria",
+    "Routique — Plan trips across Bulgaria",
     "Compare the fastest, cheapest and most convenient routes across Bulgaria by bus, train or car.",
   );
   const navigate = useNavigate();
