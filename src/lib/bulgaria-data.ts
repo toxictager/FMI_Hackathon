@@ -145,6 +145,31 @@ interface WikiQueryResponse {
   };
 }
 
+export interface WikiLandmarkSummary {
+  longDescription?: string;
+  lat?: number;
+  lng?: number;
+}
+
+export async function getWikiLandmarkSummary(
+  title: string,
+): Promise<WikiLandmarkSummary | null> {
+  const res = await fetch(
+    `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
+  );
+  if (!res.ok) return null;
+  const j = (await res.json()) as {
+    extract?: string;
+    thumbnail?: { source: string };
+    coordinates?: { lat: number; lon: number };
+  };
+  return {
+    longDescription: j.extract,
+    lat: j.coordinates?.lat,
+    lng: j.coordinates?.lon,
+  };
+}
+
 export async function getWikiLandmarkImage(
   landmarkName: string,
   thumbSize = 1200
