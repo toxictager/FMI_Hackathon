@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Clock, Ticket, CalendarHeart, ExternalLink, MapPin, Lightbulb } from "lucide-react";
-import { LANDMARKS, getWikiLandmarkImage } from "@/lib/bulgaria-data";
+import { ArrowLeft, Clock, Ticket, CalendarHeart, ExternalLink, MapPin, Lightbulb, Info, BookOpen } from "lucide-react";
+import { LANDMARKS, WikiLandmarkSummary, getWikiLandmarkSummary, getWikiLandmarkImage } from "@/lib/bulgaria-data";
 import { Header, Footer } from "@/components/SiteChrome";
 import { useDocumentMeta } from "@/lib/useDocumentMeta";
 import NotFound from "./NotFound";
@@ -18,9 +18,9 @@ export default function LandmarkPage() {
   );
 
   if (!l) return <NotFound />;
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${l.lat},${l.lng}`;
 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [wikiData, setWikiData] = useState<WikiLandmarkSummary | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -37,6 +37,25 @@ export default function LandmarkPage() {
       isMounted = false;
     };
   }, [l.name]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getWikiLandmarkSummary(l.name)
+      .then((wiki) => {
+        if (isMounted) setWikiData(wiki);
+      })
+      .catch(() => {
+        if (isMounted) setWikiData(null);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [l.name]);
+
+  const lat = wikiData?.lat ?? l.lat;
+  const lng = wikiData?.lng ?? l.lng;
 
   return (
     <div className="min-h-screen bg-background">
@@ -61,7 +80,7 @@ export default function LandmarkPage() {
                   : undefined
               }
             >
-              <Link to={queryString ? `/results?${queryString}` : "/"} className={`inline-flex items-center gap-2 text-sm font-semibold underline-offset-4 hover:underline text-foreground/80 hover:text-underline`}>
+              <Link to={queryString ? `/results?${queryString}` : "/"} className={`inline-flex items-center gap-2 text-sm font-semibold underline-offset-4 text-foreground/80 hover:underline hover:text-underline`}>
                 <ArrowLeft className="h-4 w-4" /> Back to search
               </Link>
             </div>
@@ -96,9 +115,22 @@ export default function LandmarkPage() {
               className="rounded-2xl border border-border bg-card p-6"
               style={{ boxShadow: "var(--shadow-card)" }}
             >
-              <h2 className="font-display text-2xl font-bold text-foreground">About</h2>
+              <h2 className="flex items-center gap-2 font-display text-2xl font-bold text-foreground">
+                <Info className="h-5 w-5 text-primary" /> About
+              </h2>
               <p className="mt-3 text-base leading-relaxed text-muted-foreground">{l.longDescription}</p>
             </article>
+
+            {wikiData && <article
+              className="rounded-2xl border border-border bg-card p-6"
+              style={{ boxShadow: "var(--shadow-card)" }}
+            >
+              <h2 className="flex items-center gap-2 font-display text-2xl font-bold text-foreground">
+                <BookOpen className="h-5 w-5 text-primary" /> Wiki
+              </h2>
+              <p className="mt-3 text-base leading-relaxed text-muted-foreground">{wikiData.longDescription}</p>
+              <a className="hover:underline hover:text-underline" href={`https://en.wikipedia.org/wiki/${encodeURIComponent(l.name)}`} target="_blank">Read more...</a>
+            </article>}
 
             {l.tips && l.tips.length > 0 && (
               <article
@@ -126,7 +158,7 @@ export default function LandmarkPage() {
             <InfoCard icon={CalendarHeart} label="Best time to visit" value={l.bestTime} />
 
             <a
-              href={mapsUrl}
+              href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
