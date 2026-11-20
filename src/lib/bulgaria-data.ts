@@ -14,7 +14,7 @@ export async function geocode(name: string): Promise<Coords> {
   const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
   url.searchParams.set("name", name);
   url.searchParams.set("count", "1");
-  url.searchParams.set("country_code", "BG");
+  url.searchParams.set("countryCode", "BG");
   url.searchParams.set("language", "en");
 
   const res = await fetch(url.toString());
